@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sans Fight - Enhanced</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        #game-container {
+            position: relative;
+            margin-bottom: 20px;
+            transform: translateZ(0);
+        }
+        
+        #game-canvas {
+            border: 4px solid white;
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+        
+        #dialogue-box {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background-color: #000;
+            border: 4px solid white;
+            padding: 15px;
+            display: none;
+            z-index: 10;
+        }
+        
+        #dialogue-text {
+            font-size: 18px;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        
+        #dialogue-hint {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        #gameover-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+        
+        #gameover-title {
+            color: #ff4444;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000;
+            letter-spacing: 3px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        #retry-btn {
+            background: linear-gradient(to bottom, #ff6666, #cc0000);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        
+        #retry-btn:hover {
+            background: linear-gradient(to bottom, #ff8888, #ff1111);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+        }
+        
+        #stats-container {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        #hp-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .heart-icon {
+            color: #ff4444;
+            font-size: 28px;
+            text-shadow: 0 0 10px rgba(255, 68, 68, 0.7);
+        }
+        
+        #hp-text {
+            font-size: 22px;
+            font-weight: bold;
+        }
+        
+        #controls-text {
+            font-size: 16px;
+            opacity: 0.9;
+            padding: 5px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+        
+        #game-title {
+            font-size: 42px;
+            margin-bottom: 20px;
+            text-align: center;
+            text-shadow: 0 0 15px #ffffff;
+            letter-spacing: 2px;
+            background: linear-gradient(to right, #ff6666, #ffffff, #6666ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-top: -10px;
+        }
+        
+        .attack-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #ff6666;
+            padding: 8px 15px;
+            border: 2px solid #ff6666;
+            border-radius: 20px;
+            font-size: 18px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 5;
+        }
+        
+        .damage-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ff0000;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 15;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="game-title">SANS FIGHT: CHAOS MODE</h1>
+    
+    <div id="game-container">
+        <canvas id="game-canvas" width="640" height="480"></canvas>
+        <div class="attack-indicator" id="attack-indicator"></div>
+        <div class="damage-flash" id="damage-flash"></div>
+        
+        <div id="dialogue-box">
+            <div id="dialogue-text">it's a beautiful day outside.</div>
+            <div id="dialogue-hint">Press Z to continue</div>
+        </div>
+        
+        <div id="gameover-screen">
+            <div id="gameover-title">YOU DIED</div>
+            <button id="retry-btn">Try Again</button>
+        </div>
+    </div>
+    
+    <div id="stats-container">
+        <div id="hp-container">
+            <div class="heart-icon">❤</div>
+            <div id="hp-text">92 / 92</div>
+        </div>
+        <div id="controls-text">Arrow Keys to move • Z to start</div>
+    </div>
+
+    <script>
+        // Game constants
+        const PLAYER_SPEED = 3;
+        const BATTLE_BOX = { x: 120, y: 240, width: 400, height: 200 };
+        const GRAVITY = 0.5;
+        const ATTACK_TYPES = [
+            'bones-horizontal', 
+            'bones-vertical', 
+            'bones-spiral', 
+            'bones-waves', 
+            'bones-darts', 
+            'blasters', 
+            'slam', 
+            'bones-rain', 
+            'bones-chase', 
+            'bones-cross'
+        ];
+        
+        // Game state
+        let gameState = 'intro';
+        let playerHP = 92;
+        let playerPos = { x: 320, y: 380 };
+        let bones = [];
+        let blasters = [];
+        let platforms = [];
+        let attackPhase = 0;
+        let iframes = 0;
+        let dialogue = "it's a beautiful day outside.";
+        let showDialogue = true;
+        let slamState = null;
+        let gravity = 0;
+        let velocityY = 0;
+        let sansExpression = 'normal';
+        let screenShake = 0;
+        let currentAttack = null;
+        let boneCount = 0;
+        let wavePhase = 0;
+        let chaseTargets = [];
+        
+        // DOM elements
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const dialogueBox = document.getElementById('dialogue-box');
+        const dialogueText = document.getElementById('dialogue-text');
+        const dialogueHint = document.getElementById('dialogue-hint');
+        const gameoverScreen = document.getElementById('gameover-screen');
+        const hpText = document.getElementById('hp-text');
+        const retryBtn = document.getElementById('retry-btn');
+        const attackIndicator = document.getElementById('attack-indicator');
+        const damageFlash = document.getElementById('damage-flash');
+        
+        // Key state tracking
+        const keysPressed = {};
+        
+        // Initialize game
+        function init() {
+            gameState = 'intro';
+            playerHP = 92;
+            playerPos = { x: 320, y: 380 };
+            bones = [];
+            blasters = [];
+            platforms = [];
+            attackPhase = 0;
+            iframes = 0;
+            dialogue = "it's a beautiful day outside.";
+            showDialogue = true;
+            slamState = null;
+            gravity = 0;
+            velocityY = 0;
+            sansExpression = 'normal';
+            screenShake = 0;
+            currentAttack = null;
+            boneCount = 0;
+            wavePhase = 0;
+            chaseTargets = [];
+            
+            updateUI();
+            render();
+        }
+        
+        // Update UI elements
+        function updateUI() {
+            hpText.textContent = `${playerHP} / 92`;
+            
+            if (showDialogue) {
+                dialogueBox.style.display = 'block';
+                dialogueText.textContent = dialogue;
+                dialogueHint.style.display = gameState === 'intro' ? 'block' : 'none';
+            } else {
+                dialogueBox.style.display = 'none';
+            }
+            
+            if (gameState === 'gameover') {
+                gameoverScreen.style.display = 'flex';
+            } else {
+                gameoverScreen.style.display = 'none';
+            }
+        }
+        
+        // Show attack indicator
+        function showAttackIndicator(attackName) {
+            const attackNames = {
+                'bones-horizontal': 'HORIZONTAL BONES',
+                'bones-vertical': 'VERTICAL BONES',
+                'bones-spiral': 'SPIRAL ATTACK',
+                'bones-waves': 'WAVE ATTACK',
+                'bones-darts': 'DART ATTACK',
+                'blasters': 'BLASTER',
+                'slam': 'GRAVITY SLAM',
+                'bones-rain': 'BONE RAIN',
+                'bones-chase': 'HOMING BONES',
+                'bones-cross': 'CROSS ATTACK'
+            };
+            
+            attackIndicator.textContent = attackNames[attackName] || 'ATTACK';
+            attackIndicator.style.opacity = '1';
+            
+            setTimeout(() => {
+                attackIndicator.style.opacity = '0';
+            }, 2000);
+        }
+        
+        // Trigger screen shake
+        function triggerScreenShake(intensity = 10) {
+            screenShake = intensity;
+        }
+        
+        // Show damage flash
+        function showDamageFlash() {
+            damageFlash.style.opacity = '0.4';
+            setTimeout(() => {
+                damageFlash.style.opacity = '0';
+            }, 100);
+        }
+        
+        // Draw Sans
+        function drawSans() {
+            const sansX = 320;
+            const sansY = 100;
+            
+            // Body
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(sansX - 30, sansY + 40, 60, 80);
+            
+            // Head
+            ctx.beginPath();
+            ctx.arc(sansX, sansY, 35, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Eyes
+            ctx.fillStyle = '#000';
+            if (sansExpression === 'normal') {
+                ctx.beginPath();
+                ctx.arc(sansX - 12, sansY - 5, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(sansX + 12, sansY - 5, 8, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (sansExpression === 'wink') {
+                // Left eye glowing
+                ctx.fillStyle = '#00ffff';
+                ctx.beginPath();
+                ctx.arc(sansX - 12, sansY - 5, 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Right eye closed
+                ctx.fillStyle = '#000';
+                ctx.fillRect(sansX + 5, sansY - 5, 14, 3);
+            }
+            
+            // Smile
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sansX, sansY + 10, 15, 0, Math.PI);
+            ctx.stroke();
+            
+            // Jacket
+            ctx.fillStyle = '#000';
+            ctx.fillRect(sansX - 35, sansY + 45, 70, 75);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(sansX - 30, sansY + 50, 25, 65);
+        }
+        
+        // Draw battle box
+        function drawBattleBox() {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(BATTLE_BOX.x, BATTLE_BOX.y, BATTLE_BOX.width, BATTLE_BOX.height);
+        }
+        
+        // Draw platforms
+        function drawPlatforms() {
+            ctx.fillStyle = '#4169e1';
+            platforms.forEach(platform => {
+                ctx.fillRect(platform.x, platform.y, platform.width, 8);
+            });
+        }
+        
+        // Draw bones
+        function drawBones() {
+            ctx.fillStyle = '#fff';
+            bones.forEach(bone => {
+                if (bone.type === 'dart') {
+                    // Draw dart shape
+                    ctx.save();
+                    ctx.translate(bone.x, bone.y);
+                    ctx.rotate(bone.angle);
+                    ctx.fillRect(-2, -10, 4, 20);
+                    ctx.restore();
+                } else if (bone.type === 'chase') {
+                    // Draw chasing bone with trail
+                    ctx.fillStyle = '#ff66ff';
+                    ctx.fillRect(bone.x - 5, bone.y - 15, 10, 30);
+                } else {
+                    ctx.fillRect(bone.x - 5, bone.y - 15, 10, 30);
+                }
+            });
+        }
+        
+        // Draw blasters
+        function drawBlasters() {
+            blasters.forEach(blaster => {
+                const alpha = Math.min(blaster.charge / 60, 1);
+                
+                // Blaster skull
+                ctx.fillStyle = `rgba(200, 200, 200, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(blaster.x, blaster.y, 25, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eye glow
+                ctx.fillStyle = `rgba(255, 255, 0, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(blaster.x - 8, blaster.y - 5, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(blaster.x + 8, blaster.y - 5, 5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                if (blaster.charge >= 60) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillRect(blaster.x - 120, blaster.y - 15, 240, 30);
+                }
+            });
+        }
+        
+        // Draw player
+        function drawPlayer() {
+            const flashAlpha = iframes > 0 && Math.floor(iframes / 5) % 2 === 0 ? 0.3 : 1;
+            ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
+            ctx.beginPath();
+            ctx.arc(playerPos.x, playerPos.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Apply screen shake
+        function applyScreenShake() {
+            if (screenShake > 0) {
+                const shakeX = (Math.random() - 0.5) * screenShake;
+                const shakeY = (Math.random() - 0.5) * screenShake;
+                canvas.style.transform = `translate(${shakeX}px, ${shakeY}px)`;
+                screenShake *= 0.9;
+                if (screenShake < 0.5) screenShake = 0;
+            } else {
+                canvas.style.transform = 'translate(0, 0)';
+            }
+        }
+        
+        // Render game
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 640, 480);
+            
+            // Apply screen shake
+            applyScreenShake();
+            
+            // Draw game elements
+            drawSans();
+            drawBattleBox();
+            drawPlatforms();
+            drawBones();
+            drawBlasters();
+            drawPlayer();
+        }
+        
+        // Update game state
+        function update() {
+            if (gameState !== 'fighting') return;
+            
+            // Update player position
+            let newX = playerPos.x;
+            let newY = playerPos.y;
+            let newVelY = velocityY;
+            
+            if (slamState) {
+                // During slam attack, apply gravity
+                newVelY += gravity;
+                newY += newVelY;
+                
+                // Check platform collisions
+                let onPlatform = false;
+                for (const platform of platforms) {
+                    if (newY >= platform.y - 8 && 
+                        newY <= platform.y + 5 &&
+                        newX >= platform.x && 
+                        newX <= platform.x + platform.width) {
+                        newY = platform.y - 8;
+                        newVelY = 0;
+                        onPlatform = true;
+                        break;
+                    }
+                }
+                
+                // Horizontal movement only
+                if (keysPressed['ArrowLeft']) newX -= PLAYER_SPEED;
+                if (keysPressed['ArrowRight']) newX += PLAYER_SPEED;
+                
+                // Check if hit bottom
+                if (newY >= BATTLE_BOX.y + BATTLE_BOX.height - 10) {
+                    newY = BATTLE_BOX.y + BATTLE_BOX.height - 10;
+                    newVelY = 0;
+                }
+            } else {
+                // Normal movement
+                if (keysPressed['ArrowLeft']) newX -= PLAYER_SPEED;
+                if (keysPressed['ArrowRight']) newX += PLAYER_SPEED;
+                if (keysPressed['ArrowUp']) newY -= PLAYER_SPEED;
+                if (keysPressed['ArrowDown']) newY += PLAYER_SPEED;
+            }
+            
+            // Clamp to battle box
+            newX = Math.max(BATTLE_BOX.x + 10, Math.min(BATTLE_BOX.x + BATTLE_BOX.width - 10, newX));
+            newY = Math.max(BATTLE_BOX.y + 10, Math.min(BATTLE_BOX.y + BATTLE_BOX.height - 10, newY));
+            
+            playerPos.x = newX;
+            playerPos.y = newY;
+            velocityY = newVelY;
+            
+            // Update bones
+            bones = bones.map(bone => {
+                if (bone.type === 'spiral') {
+                    // Spiral movement
+                    bone.angle += bone.rotationSpeed;
+                    bone.radius += bone.radiusSpeed;
+                    bone.x = bone.centerX + Math.cos(bone.angle) * bone.radius;
+                    bone.y = bone.centerY + Math.sin(bone.angle) * bone.radius;
+                } else if (bone.type === 'wave') {
+                    // Wave movement
+                    bone.x += bone.vx;
+                    bone.y = bone.startY + Math.sin(bone.x * 0.05 + wavePhase) * 30;
+                } else if (bone.type === 'dart') {
+                    // Dart movement
+                    bone.x += bone.vx;
+                    bone.y += bone.vy;
+                    bone.angle = Math.atan2(bone.vy, bone.vx);
+                } else if (bone.type === 'chase') {
+                    // Homing movement
+                    const dx = playerPos.x - bone.x;
+                    const dy = playerPos.y - bone.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 5) {
+                        bone.vx = (dx / dist) * bone.speed;
+                        bone.vy = (dy / dist) * bone.speed;
+                    }
+                    bone.x += bone.vx;
+                    bone.y += bone.vy;
+                } else {
+                    // Regular movement
+                    bone.x += bone.vx;
+                    bone.y += bone.vy;
+                }
+                return bone;
+            }).filter(bone => 
+                bone.x > -50 && bone.x < 690 && bone.y > -50 && bone.y < 530
+            );
+            
+            // Update wave phase
+            wavePhase += 0.1;
+            
+            // Check bone collisions
+            if (iframes === 0) {
+                for (const bone of bones) {
+                    const dx = playerPos.x - bone.x;
+                    const dy = playerPos.y - bone.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 18) {
+                        playerHP = Math.max(0, playerHP - (bone.type === 'dart' || bone.type === 'chase' ? 10 : 5));
+                        iframes = 30;
+                        sansExpression = 'wink';
+                        showDamageFlash();
+                        triggerScreenShake(15);
+                        setTimeout(() => sansExpression = 'normal', 500);
+                        break;
+                    }
+                }
+            }
+            
+            // Update blasters
+            blasters = blasters.map(blaster => ({
+                ...blaster,
+                charge: blaster.charge + 1
+            })).filter(blaster => blaster.charge < 80);
+            
+            // Check blaster collisions
+            const firingBlasters = blasters.filter(b => b.charge === 60);
+            if (firingBlasters.length > 0 && iframes === 0) {
+                for (const blaster of firingBlasters) {
+                    const dx = playerPos.x - blaster.x;
+                    const dy = playerPos.y - blaster.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 50) {
+                        playerHP = Math.max(0, playerHP - 10);
+                        iframes = 30;
+                        sansExpression = 'wink';
+                        showDamageFlash();
+                        triggerScreenShake(20);
+                        setTimeout(() => sansExpression = 'normal', 500);
+                        break;
+                    }
+                }
+            }
+            
+            // Update iframes
+            if (iframes > 0) iframes--;
+            
+            // Check game over
+            if (playerHP <= 0 && gameState === 'fighting') {
+                gameState = 'gameover';
+                dialogue = 'geeettttttt dunked on!!!';
+                showDialogue = true;
+                sansExpression = 'wink';
+            }
+            
+            updateUI();
+        }
+        
+        // Game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Attack phase manager with randomization
+        function startAttackPhase() {
+            if (gameState !== 'fighting') return;
+            
+            // Randomly select an attack type
+            const randomAttack = ATTACK_TYPES[Math.floor(Math.random() * ATTACK_TYPES.length)];
+            currentAttack = randomAttack;
+            showAttackIndicator(randomAttack);
+            
+            switch(randomAttack) {
+                case 'bones-horizontal':
+                    // Horizontal bones from sides
+                    const side = Math.random() < 0.5 ? 'left' : 'right';
+                    for (let i = 0; i < 5; i++) {
+                        bones.push({
+                            x: side === 'left' ? BATTLE_BOX.x : BATTLE_BOX.x + BATTLE_BOX.width,
+                            y: BATTLE_BOX.y + 30 + i * 35,
+                            vx: side === 'left' ? 4 : -4,
+                            vy: 0
+                        });
+                    }
+                    break;
+                    
+                case 'bones-vertical':
+                    // Vertical bones from top and bottom
+                    const topCount = Math.floor(Math.random() * 3) + 3;
+                    const bottomCount = Math.floor(Math.random() * 3) + 3;
+                    
+                    for (let i = 0; i < topCount; i++) {
+                        bones.push({
+                            x: BATTLE_BOX.x + 50 + i * 60,
+                            y: BATTLE_BOX.y,
+                            vx: 0,
+                            vy: 4
+                        });
+                    }
+                    
+                    for (let i = 0; i < bottomCount; i++) {
+                        bones.push({
+                            x: BATTLE_BOX.x + 50 + i * 60,
+                            y: BATTLE_BOX.y + BATTLE_BOX.height,
+                            vx: 0,
+                            vy: -4
+                        });
+                    }
+                    break;
+                    
+                case 'bones-spiral':
+                    // Spiral bones from center
+                    const spiralCount = 12;
+                    for (let i = 0; i < spiralCount; i++) {
+                        bones.push({
+                            type: 'spiral',
+                            centerX: BATTLE_BOX.x + BATTLE_BOX.width/2,
+                            centerY: BATTLE_BOX.y + BATTLE_BOX.height/2,
+                            angle: (i / spiralCount) * Math.PI * 2,
+                            radius: 10,
+                            radiusSpeed: 1.5,
+                            rotationSpeed: 0.05
+                        });
+                    }
+                    break;
+                    
+                case 'bones-waves':
+                    // Wave pattern bones
+                    for (let i = 0; i < 6; i++) {
+                        bones.push({
+                            type: 'wave',
+                            x: BATTLE_BOX.x,
+                            y: 0,
+                            startY: BATTLE_BOX.y + 30 + i * 25,
+                            vx: 3
+                        });
+                    }
+                    break;
+                    
+                case 'bones-darts':
+                    // Fast darts from random positions
+                    for (let i = 0; i < 8; i++) {
+                        const startX = BATTLE_BOX.x + Math.random() * BATTLE_BOX.width;
+                        const startY = BATTLE_BOX.y + Math.random() * BATTLE_BOX.height;
+                        const angle = Math.atan2(playerPos.y - startY, playerPos.x - startX);
+                        const speed = 8;
+                        
+                        bones.push({
+                            type: 'dart',
+                            x: startX,
+                            y: startY,
+                            vx: Math.cos(angle) * speed,
+                            vy: Math.sin(angle) * speed,
+                            angle: angle
+                        });
+                    }
+                    break;
+                    
+                case 'blasters':
+                    // Blasters with random positions
+                    const blasterCount = Math.floor(Math.random() * 2) + 1;
+                    for (let i = 0; i < blasterCount; i++) {
+                        blasters.push({
+                            x: BATTLE_BOX.x + 80 + Math.random() * 240,
+                            y: BATTLE_BOX.y + 50 + Math.random() * 100,
+                            charge: 0
+                        });
+                    }
+                    break;
+                    
+                case 'slam':
+                    // Slam attack with platforms
+                    slamState = 'active';
+                    gravity = GRAVITY;
+                    platforms = [
+                        { x: BATTLE_BOX.x + 50, y: BATTLE_BOX.y + 100, width: 100 },
+                        { x: BATTLE_BOX.x + 250, y: BATTLE_BOX.y + 80, width: 100 }
+                    ];
+                    
+                    // Spawn bones from bottom
+                    for (let i = 0; i < 5; i++) {
+                        bones.push({
+                            x: BATTLE_BOX.x + 50 + i * 70,
+                            y: BATTLE_BOX.y + BATTLE_BOX.height,
+                            vx: 0,
+                            vy: -3
+                        });
+                    }
+                    
+                    setTimeout(() => {
+                        slamState = null;
+                        gravity = 0;
+                        velocityY = 0;
+                        platforms = [];
+                    }, 3000);
+                    break;
+                    
+                case 'bones-rain':
+                    // Bone rain from top
+                    for (let i = 0; i < 15; i++) {
+                        bones.push({
+                            x: BATTLE_BOX.x + 20 + Math.random() * (BATTLE_BOX.width - 40),
+                            y: BATTLE_BOX.y - 20,
+                            vx: (Math.random() - 0.5) * 2,
+                            vy: 6 + Math.random() * 3
+                        });
+                    }
+                    break;
+                    
+                case 'bones-chase':
+                    // Homing bones
+                    for (let i = 0; i < 4; i++) {
+                        bones.push({
+                            type: 'chase',
+                            x: BATTLE_BOX.x + Math.random() * BATTLE_BOX.width,
+                            y: BATTLE_BOX.y + Math.random() * BATTLE_BOX.height,
+                            vx: 0,
+                            vy: 0,
+                            speed: 2 + Math.random() * 1.5
+                        });
+                    }
+                    break;
+                    
+                case 'bones-cross':
+                    // Cross pattern bones
+                    const centerX = BATTLE_BOX.x + BATTLE_BOX.width/2;
+                    const centerY = BATTLE_BOX.y + BATTLE_BOX.height/2;
+                    
+                    // Horizontal bones
+                    for (let i = 0; i < 4; i++) {
+                        bones.push({
+                            x: BATTLE_BOX.x,
+                            y: centerY - 40 + i * 25,
+                            vx: 5,
+                            vy: 0
+                        });
+                        bones.push({
+                            x: BATTLE_BOX.x + BATTLE_BOX.width,
+                            y: centerY - 40 + i * 25,
+                            vx: -5,
+                            vy: 0
+                        });
+                    }
+                    
+                    // Vertical bones
+                    for (let i = 0; i < 4; i++) {
+                        bones.push({
+                            x: centerX - 40 + i * 25,
+                            y: BATTLE_BOX.y,
+                            vx: 0,
+                            vy: 5
+                        });
+                        bones.push({
+                            x: centerX - 40 + i * 25,
+                            y: BATTLE_BOX.y + BATTLE_BOX.height,
+                            vx: 0,
+                            vy: -5
+                        });
+                    }
+                    break;
+            }
+            
+            // Schedule next attack (random interval between 1.5-3 seconds)
+            const nextAttackTime = 1500 + Math.random() * 1500;
+            setTimeout(startAttackPhase, nextAttackTime);
+        }
+        
+        // Event listeners
+        window.addEventListener('keydown', (e) => {
+            keysPressed[e.key] = true;
+            
+            if (gameState === 'intro' && e.key === 'z') {
+                gameState = 'fighting';
+                showDialogue = false;
+                dialogue = '';
+                startAttackPhase();
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keysPressed[e.key] = false;
+        });
+        
+        retryBtn.addEventListener('click', () => {
+            init();
+        });
+        
+        // Initialize and start game
+        init();
+        gameLoop();
+    </script>
+</body>
+</html>
