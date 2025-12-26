@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sans Fight - Enhanced</title>
+    <title>Sans Fight: Complete Edition</title>
     <style>
         * {
             margin: 0;
@@ -60,7 +60,7 @@
             opacity: 0.8;
         }
         
-        #gameover-screen {
+        #gameover-screen, #victory-screen {
             position: absolute;
             top: 0;
             left: 0;
@@ -83,13 +83,22 @@
             animation: pulse 1.5s infinite;
         }
         
+        #victory-title {
+            color: #44ff44;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px #00ff00, 0 0 30px #00ff00;
+            letter-spacing: 3px;
+            animation: pulse 1.5s infinite;
+        }
+        
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
         
-        #retry-btn {
+        .screen-btn {
             background: linear-gradient(to bottom, #ff6666, #cc0000);
             color: white;
             border: none;
@@ -105,10 +114,17 @@
             font-weight: bold;
         }
         
-        #retry-btn:hover {
-            background: linear-gradient(to bottom, #ff8888, #ff1111);
+        #victory-btn {
+            background: linear-gradient(to bottom, #66ff66, #00cc00);
+        }
+        
+        .screen-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+        }
+        
+        #victory-btn:hover {
+            background: linear-gradient(to bottom, #88ff88, #00ff00);
         }
         
         #stats-container {
@@ -122,7 +138,7 @@
             border: 2px solid rgba(255, 255, 255, 0.3);
         }
         
-        #hp-container {
+        #hp-container, #timer-container {
             display: flex;
             align-items: center;
             gap: 12px;
@@ -134,7 +150,13 @@
             text-shadow: 0 0 10px rgba(255, 68, 68, 0.7);
         }
         
-        #hp-text {
+        .timer-icon {
+            color: #44aaff;
+            font-size: 28px;
+            text-shadow: 0 0 10px rgba(68, 170, 255, 0.7);
+        }
+        
+        #hp-text, #timer-text {
             font-size: 22px;
             font-weight: bold;
         }
@@ -186,15 +208,46 @@
             pointer-events: none;
             z-index: 15;
         }
+        
+        .victory-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #00ff00;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 15;
+        }
+        
+        #win-counter {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #44ff44;
+            padding: 10px 20px;
+            border: 2px solid #44ff44;
+            border-radius: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 5;
+        }
     </style>
 </head>
 <body>
-    <h1 id="game-title">SANS FIGHT: CHAOS MODE</h1>
+    <h1 id="game-title">SANS FIGHT: COMPLETE EDITION</h1>
     
     <div id="game-container">
         <canvas id="game-canvas" width="640" height="480"></canvas>
         <div class="attack-indicator" id="attack-indicator"></div>
         <div class="damage-flash" id="damage-flash"></div>
+        <div class="victory-flash" id="victory-flash"></div>
+        <div id="win-counter"></div>
         
         <div id="dialogue-box">
             <div id="dialogue-text">it's a beautiful day outside.</div>
@@ -203,7 +256,13 @@
         
         <div id="gameover-screen">
             <div id="gameover-title">YOU DIED</div>
-            <button id="retry-btn">Try Again</button>
+            <button id="retry-btn" class="screen-btn">Try Again</button>
+        </div>
+        
+        <div id="victory-screen">
+            <div id="victory-title">YOU WON!</div>
+            <div style="color: #aaa; margin: 15px 0; font-size: 20px;">nice job, bud.</div>
+            <button id="victory-btn" class="screen-btn">Play Again</button>
         </div>
     </div>
     
@@ -211,6 +270,10 @@
         <div id="hp-container">
             <div class="heart-icon">❤</div>
             <div id="hp-text">92 / 92</div>
+        </div>
+        <div id="timer-container">
+            <div class="timer-icon">⏱</div>
+            <div id="timer-text">60s</div>
         </div>
         <div id="controls-text">Arrow Keys to move • Z to start</div>
     </div>
@@ -232,6 +295,7 @@
             'bones-chase', 
             'bones-cross'
         ];
+        const WIN_TIME = 60; // Seconds to win
         
         // Game state
         let gameState = 'intro';
@@ -253,6 +317,9 @@
         let boneCount = 0;
         let wavePhase = 0;
         let chaseTargets = [];
+        let winTimer = WIN_TIME;
+        let winTimerInterval = null;
+        let winCounter = 0;
         
         // DOM elements
         const canvas = document.getElementById('game-canvas');
@@ -261,10 +328,15 @@
         const dialogueText = document.getElementById('dialogue-text');
         const dialogueHint = document.getElementById('dialogue-hint');
         const gameoverScreen = document.getElementById('gameover-screen');
+        const victoryScreen = document.getElementById('victory-screen');
         const hpText = document.getElementById('hp-text');
+        const timerText = document.getElementById('timer-text');
         const retryBtn = document.getElementById('retry-btn');
+        const victoryBtn = document.getElementById('victory-btn');
         const attackIndicator = document.getElementById('attack-indicator');
         const damageFlash = document.getElementById('damage-flash');
+        const victoryFlash = document.getElementById('victory-flash');
+        const winCounterEl = document.getElementById('win-counter');
         
         // Key state tracking
         const keysPressed = {};
@@ -290,6 +362,14 @@
             boneCount = 0;
             wavePhase = 0;
             chaseTargets = [];
+            winTimer = WIN_TIME;
+            winCounter = 0;
+            
+            // Clear any existing timer
+            if (winTimerInterval) {
+                clearInterval(winTimerInterval);
+                winTimerInterval = null;
+            }
             
             updateUI();
             render();
@@ -298,6 +378,7 @@
         // Update UI elements
         function updateUI() {
             hpText.textContent = `${playerHP} / 92`;
+            timerText.textContent = `${Math.ceil(winTimer)}s`;
             
             if (showDialogue) {
                 dialogueBox.style.display = 'block';
@@ -311,6 +392,12 @@
                 gameoverScreen.style.display = 'flex';
             } else {
                 gameoverScreen.style.display = 'none';
+            }
+            
+            if (gameState === 'victory') {
+                victoryScreen.style.display = 'flex';
+            } else {
+                victoryScreen.style.display = 'none';
             }
         }
         
@@ -350,6 +437,25 @@
             }, 100);
         }
         
+        // Show victory flash
+        function showVictoryFlash() {
+            victoryFlash.style.opacity = '0.3';
+            setTimeout(() => {
+                victoryFlash.style.opacity = '0';
+            }, 200);
+        }
+        
+        // Show win counter
+        function showWinCounter() {
+            winCounter++;
+            winCounterEl.textContent = `+1 WIN! (${winCounter})`;
+            winCounterEl.style.opacity = '1';
+            
+            setTimeout(() => {
+                winCounterEl.style.opacity = '0';
+            }, 2000);
+        }
+        
         // Draw Sans
         function drawSans() {
             const sansX = 320;
@@ -383,14 +489,31 @@
                 // Right eye closed
                 ctx.fillStyle = '#000';
                 ctx.fillRect(sansX + 5, sansY - 5, 14, 3);
+            } else if (sansExpression === 'smile') {
+                // Happy expression for victory
+                ctx.beginPath();
+                ctx.arc(sansX - 12, sansY - 5, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(sansX + 12, sansY - 5, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Big smile
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(sansX, sansY + 15, 20, 0, Math.PI);
+                ctx.stroke();
             }
             
-            // Smile
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(sansX, sansY + 10, 15, 0, Math.PI);
-            ctx.stroke();
+            // Smile (normal)
+            if (sansExpression !== 'smile') {
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sansX, sansY + 10, 15, 0, Math.PI);
+                ctx.stroke();
+            }
             
             // Jacket
             ctx.fillStyle = '#000';
@@ -866,6 +989,34 @@
             setTimeout(startAttackPhase, nextAttackTime);
         }
         
+        // Win condition timer
+        function startWinTimer() {
+            winTimerInterval = setInterval(() => {
+                winTimer -= 0.1;
+                
+                // Update Sans expression as time runs out
+                if (winTimer < 10) {
+                    sansExpression = 'wink';
+                    setTimeout(() => {
+                        if (gameState === 'fighting') sansExpression = 'normal';
+                    }, 300);
+                }
+                
+                // Check win condition
+                if (winTimer <= 0 && gameState === 'fighting') {
+                    clearInterval(winTimerInterval);
+                    gameState = 'victory';
+                    dialogue = 'nice job, bud.';
+                    showDialogue = true;
+                    sansExpression = 'smile';
+                    showVictoryFlash();
+                    showWinCounter();
+                }
+                
+                updateUI();
+            }, 100);
+        }
+        
         // Event listeners
         window.addEventListener('keydown', (e) => {
             keysPressed[e.key] = true;
@@ -875,6 +1026,7 @@
                 showDialogue = false;
                 dialogue = '';
                 startAttackPhase();
+                startWinTimer();
             }
         });
         
@@ -883,6 +1035,10 @@
         });
         
         retryBtn.addEventListener('click', () => {
+            init();
+        });
+        
+        victoryBtn.addEventListener('click', () => {
             init();
         });
         
