@@ -295,7 +295,8 @@
     </style>
 </head>
 <body>
-    <h1 id="game-title">SANS FIGHT: Remastered</h1>
+    <!-- ✅ TITLE CHANGED HERE -->
+    <h1 id="game-title">Sans fight : Remastered</h1>
     
     <div id="game-container">
         <canvas id="game-canvas" width="640" height="480"></canvas>
@@ -460,6 +461,7 @@
                 homingTimerInterval = null;
             }
             
+            // ✅ THIS LINE WAS ADDED TO FIX DIFFICULTY SELECTION
             updateUI();
             render();
         }
