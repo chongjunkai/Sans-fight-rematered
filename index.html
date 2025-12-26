@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sans Fight: Balanced Edition</title>
+    <title>Sans Fight: Fixed Edition</title>
     <style>
         * {
             margin: 0;
@@ -295,7 +295,7 @@
     </style>
 </head>
 <body>
-    <h1 id="game-title">SANS FIGHT: BALANCED EDITION</h1>
+    <h1 id="game-title">SANS FIGHT: FIXED EDITION</h1>
     
     <div id="game-container">
         <canvas id="game-canvas" width="640" height="480"></canvas>
@@ -396,6 +396,7 @@
         let homingActive = false;
         let homingTimer = 0;
         let homingTimerInterval = null;
+        let homingBoneIds = new Set(); // Track homing bone IDs
         
         // DOM elements
         const canvas = document.getElementById('game-canvas');
@@ -449,6 +450,7 @@
             winCounter = 0;
             homingActive = false;
             homingTimer = 0;
+            homingBoneIds.clear();
             
             // Clear any existing timers
             if (winTimerInterval) {
@@ -545,10 +547,7 @@
                 homingTimer -= 0.1;
                 
                 if (homingTimer <= 0) {
-                    homingActive = false;
-                    clearInterval(homingTimerInterval);
-                    homingTimerInterval = null;
-                    homingTimerEl.style.opacity = '0';
+                    stopHomingPhase();
                 }
                 
                 updateUI();
@@ -563,6 +562,10 @@
                 homingTimerInterval = null;
             }
             homingTimerEl.style.opacity = '0';
+            
+            // Remove all homing bones
+            bones = bones.filter(bone => !homingBoneIds.has(bone.id));
+            homingBoneIds.clear();
         }
         
         // Trigger screen shake
@@ -1089,14 +1092,17 @@
                 case 'bones-chase':
                     // Homing bones (less OP)
                     for (let i = 0; i < 3; i++) { // Reduced count
+                        const boneId = Date.now() + Math.random();
                         bones.push({
                             type: 'chase',
+                            id: boneId,
                             x: BATTLE_BOX.x + Math.random() * BATTLE_BOX.width,
                             y: BATTLE_BOX.y + Math.random() * BATTLE_BOX.height,
                             vx: 0,
                             vy: 0,
                             speed: DIFFICULTY_SETTINGS[difficulty].homingSpeed
                         });
+                        homingBoneIds.add(boneId);
                     }
                     // Activate homing phase
                     startHomingPhase();
