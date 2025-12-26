@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sans Fight: Complete Edition</title>
+    <title>Sans Fight: Balanced Edition</title>
     <style>
         * {
             margin: 0;
@@ -60,7 +60,7 @@
             opacity: 0.8;
         }
         
-        #gameover-screen, #victory-screen {
+        #difficulty-screen, #gameover-screen, #victory-screen {
             position: absolute;
             top: 0;
             left: 0;
@@ -72,6 +72,14 @@
             align-items: center;
             justify-content: center;
             z-index: 20;
+        }
+        
+        #difficulty-title {
+            color: #ffaa44;
+            font-size: 48px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 15px #ffaa44;
+            letter-spacing: 2px;
         }
         
         #gameover-title {
@@ -112,6 +120,19 @@
             letter-spacing: 1px;
             text-transform: uppercase;
             font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        #easy-btn {
+            background: linear-gradient(to bottom, #44aaff, #0066cc);
+        }
+        
+        #medium-btn {
+            background: linear-gradient(to bottom, #44ff44, #00cc00);
+        }
+        
+        #hard-btn {
+            background: linear-gradient(to bottom, #ff4444, #cc0000);
         }
         
         #victory-btn {
@@ -123,8 +144,26 @@
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
         }
         
+        #easy-btn:hover {
+            background: linear-gradient(to bottom, #66bbff, #0088ee);
+        }
+        
+        #medium-btn:hover {
+            background: linear-gradient(to bottom, #66ff66, #00ff00);
+        }
+        
+        #hard-btn:hover {
+            background: linear-gradient(to bottom, #ff6666, #ff1111);
+        }
+        
         #victory-btn:hover {
             background: linear-gradient(to bottom, #88ff88, #00ff00);
+        }
+        
+        .difficulty-desc {
+            color: #aaa;
+            margin: 8px 0;
+            font-size: 16px;
         }
         
         #stats-container {
@@ -197,6 +236,22 @@
             z-index: 5;
         }
         
+        .homing-timer {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 100, 200, 0.8);
+            color: #66ccff;
+            padding: 8px 15px;
+            border: 2px solid #66ccff;
+            border-radius: 20px;
+            font-size: 18px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 5;
+        }
+        
         .damage-flash {
             position: absolute;
             top: 0;
@@ -223,7 +278,7 @@
         
         #win-counter {
             position: absolute;
-            top: 60px;
+            top: 100px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.7);
@@ -240,11 +295,12 @@
     </style>
 </head>
 <body>
-    <h1 id="game-title">SANS FIGHT: COMPLETE EDITION</h1>
+    <h1 id="game-title">SANS FIGHT: BALANCED EDITION</h1>
     
     <div id="game-container">
         <canvas id="game-canvas" width="640" height="480"></canvas>
         <div class="attack-indicator" id="attack-indicator"></div>
+        <div class="homing-timer" id="homing-timer"></div>
         <div class="damage-flash" id="damage-flash"></div>
         <div class="victory-flash" id="victory-flash"></div>
         <div id="win-counter"></div>
@@ -252,6 +308,16 @@
         <div id="dialogue-box">
             <div id="dialogue-text">it's a beautiful day outside.</div>
             <div id="dialogue-hint">Press Z to continue</div>
+        </div>
+        
+        <div id="difficulty-screen">
+            <div id="difficulty-title">SELECT DIFFICULTY</div>
+            <button id="easy-btn" class="screen-btn">EASY MODE</button>
+            <div class="difficulty-desc">Survive for 90 seconds</div>
+            <button id="medium-btn" class="screen-btn">MEDIUM MODE</button>
+            <div class="difficulty-desc">Survive for 60 seconds (balanced)</div>
+            <button id="hard-btn" class="screen-btn">HARD MODE</button>
+            <div class="difficulty-desc">Survive for 45 seconds</div>
         </div>
         
         <div id="gameover-screen">
@@ -295,10 +361,16 @@
             'bones-chase', 
             'bones-cross'
         ];
-        const WIN_TIME = 60; // Seconds to win
+        
+        // Difficulty settings
+        const DIFFICULTY_SETTINGS = {
+            'easy': { time: 90, homingSpeed: 1.8, homingDuration: 8, boneSpeed: 4 },
+            'medium': { time: 60, homingSpeed: 2.2, homingDuration: 6, boneSpeed: 5 },
+            'hard': { time: 45, homingSpeed: 2.8, homingDuration: 5, boneSpeed: 6 }
+        };
         
         // Game state
-        let gameState = 'intro';
+        let gameState = 'difficulty';
         let playerHP = 92;
         let playerPos = { x: 320, y: 380 };
         let bones = [];
@@ -317,9 +389,13 @@
         let boneCount = 0;
         let wavePhase = 0;
         let chaseTargets = [];
-        let winTimer = WIN_TIME;
+        let winTimer = 60;
         let winTimerInterval = null;
         let winCounter = 0;
+        let difficulty = 'medium';
+        let homingActive = false;
+        let homingTimer = 0;
+        let homingTimerInterval = null;
         
         // DOM elements
         const canvas = document.getElementById('game-canvas');
@@ -327,6 +403,7 @@
         const dialogueBox = document.getElementById('dialogue-box');
         const dialogueText = document.getElementById('dialogue-text');
         const dialogueHint = document.getElementById('dialogue-hint');
+        const difficultyScreen = document.getElementById('difficulty-screen');
         const gameoverScreen = document.getElementById('gameover-screen');
         const victoryScreen = document.getElementById('victory-screen');
         const hpText = document.getElementById('hp-text');
@@ -334,15 +411,22 @@
         const retryBtn = document.getElementById('retry-btn');
         const victoryBtn = document.getElementById('victory-btn');
         const attackIndicator = document.getElementById('attack-indicator');
+        const homingTimerEl = document.getElementById('homing-timer');
         const damageFlash = document.getElementById('damage-flash');
         const victoryFlash = document.getElementById('victory-flash');
         const winCounterEl = document.getElementById('win-counter');
+        const easyBtn = document.getElementById('easy-btn');
+        const mediumBtn = document.getElementById('medium-btn');
+        const hardBtn = document.getElementById('hard-btn');
         
         // Key state tracking
         const keysPressed = {};
         
         // Initialize game
-        function init() {
+        function init(diff = 'medium') {
+            difficulty = diff;
+            winTimer = DIFFICULTY_SETTINGS[difficulty].time;
+            
             gameState = 'intro';
             playerHP = 92;
             playerPos = { x: 320, y: 380 };
@@ -362,13 +446,18 @@
             boneCount = 0;
             wavePhase = 0;
             chaseTargets = [];
-            winTimer = WIN_TIME;
             winCounter = 0;
+            homingActive = false;
+            homingTimer = 0;
             
-            // Clear any existing timer
+            // Clear any existing timers
             if (winTimerInterval) {
                 clearInterval(winTimerInterval);
                 winTimerInterval = null;
+            }
+            if (homingTimerInterval) {
+                clearInterval(homingTimerInterval);
+                homingTimerInterval = null;
             }
             
             updateUI();
@@ -388,6 +477,12 @@
                 dialogueBox.style.display = 'none';
             }
             
+            if (gameState === 'difficulty') {
+                difficultyScreen.style.display = 'flex';
+            } else {
+                difficultyScreen.style.display = 'none';
+            }
+            
             if (gameState === 'gameover') {
                 gameoverScreen.style.display = 'flex';
             } else {
@@ -398,6 +493,14 @@
                 victoryScreen.style.display = 'flex';
             } else {
                 victoryScreen.style.display = 'none';
+            }
+            
+            // Update homing timer display
+            if (homingActive) {
+                homingTimerEl.textContent = `HOMING BONES: ${Math.ceil(homingTimer)}s`;
+                homingTimerEl.style.opacity = '1';
+            } else {
+                homingTimerEl.style.opacity = '0';
             }
         }
         
@@ -422,6 +525,44 @@
             setTimeout(() => {
                 attackIndicator.style.opacity = '0';
             }, 2000);
+        }
+        
+        // Start homing bone phase
+        function startHomingPhase() {
+            homingActive = true;
+            homingTimer = DIFFICULTY_SETTINGS[difficulty].homingDuration;
+            
+            // Show homing timer
+            homingTimerEl.style.opacity = '1';
+            
+            // Clear any existing homing timer
+            if (homingTimerInterval) {
+                clearInterval(homingTimerInterval);
+            }
+            
+            // Start homing timer
+            homingTimerInterval = setInterval(() => {
+                homingTimer -= 0.1;
+                
+                if (homingTimer <= 0) {
+                    homingActive = false;
+                    clearInterval(homingTimerInterval);
+                    homingTimerInterval = null;
+                    homingTimerEl.style.opacity = '0';
+                }
+                
+                updateUI();
+            }, 100);
+        }
+        
+        // Stop homing bone phase
+        function stopHomingPhase() {
+            homingActive = false;
+            if (homingTimerInterval) {
+                clearInterval(homingTimerInterval);
+                homingTimerInterval = null;
+            }
+            homingTimerEl.style.opacity = '0';
         }
         
         // Trigger screen shake
@@ -539,7 +680,9 @@
         
         // Draw bones
         function drawBones() {
+            // All bones are white
             ctx.fillStyle = '#fff';
+            
             bones.forEach(bone => {
                 if (bone.type === 'dart') {
                     // Draw dart shape
@@ -549,9 +692,10 @@
                     ctx.fillRect(-2, -10, 4, 20);
                     ctx.restore();
                 } else if (bone.type === 'chase') {
-                    // Draw chasing bone with trail
-                    ctx.fillStyle = '#ff66ff';
+                    // Draw chasing bone with light blue color
+                    ctx.fillStyle = '#66ccff';
                     ctx.fillRect(bone.x - 5, bone.y - 15, 10, 30);
+                    ctx.fillStyle = '#fff'; // Reset for next bone
                 } else {
                     ctx.fillRect(bone.x - 5, bone.y - 15, 10, 30);
                 }
@@ -696,18 +840,20 @@
                     bone.y += bone.vy;
                     bone.angle = Math.atan2(bone.vy, bone.vx);
                 } else if (bone.type === 'chase') {
-                    // Homing movement
+                    // Homing movement (reduced speed)
                     const dx = playerPos.x - bone.x;
                     const dy = playerPos.y - bone.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist > 5) {
-                        bone.vx = (dx / dist) * bone.speed;
-                        bone.vy = (dy / dist) * bone.speed;
+                        // Use difficulty-specific homing speed
+                        const speed = DIFFICULTY_SETTINGS[difficulty].homingSpeed;
+                        bone.vx = (dx / dist) * speed;
+                        bone.vy = (dy / dist) * speed;
                     }
                     bone.x += bone.vx;
                     bone.y += bone.vy;
                 } else {
-                    // Regular movement
+                    // Regular movement with difficulty speed
                     bone.x += bone.vx;
                     bone.y += bone.vy;
                 }
@@ -727,7 +873,12 @@
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     
                     if (distance < 18) {
-                        playerHP = Math.max(0, playerHP - (bone.type === 'dart' || bone.type === 'chase' ? 10 : 5));
+                        // Different damage based on bone type
+                        let damage = 5;
+                        if (bone.type === 'dart') damage = 10;
+                        if (bone.type === 'chase') damage = 7; // Reduced homing damage
+                        
+                        playerHP = Math.max(0, playerHP - damage);
                         iframes = 30;
                         sansExpression = 'wink';
                         showDamageFlash();
@@ -773,6 +924,7 @@
                 dialogue = 'geeettttttt dunked on!!!';
                 showDialogue = true;
                 sansExpression = 'wink';
+                stopHomingPhase();
             }
             
             updateUI();
@@ -794,6 +946,9 @@
             currentAttack = randomAttack;
             showAttackIndicator(randomAttack);
             
+            // Difficulty-specific bone speed
+            const boneSpeed = DIFFICULTY_SETTINGS[difficulty].boneSpeed;
+            
             switch(randomAttack) {
                 case 'bones-horizontal':
                     // Horizontal bones from sides
@@ -802,7 +957,7 @@
                         bones.push({
                             x: side === 'left' ? BATTLE_BOX.x : BATTLE_BOX.x + BATTLE_BOX.width,
                             y: BATTLE_BOX.y + 30 + i * 35,
-                            vx: side === 'left' ? 4 : -4,
+                            vx: side === 'left' ? boneSpeed : -boneSpeed,
                             vy: 0
                         });
                     }
@@ -818,7 +973,7 @@
                             x: BATTLE_BOX.x + 50 + i * 60,
                             y: BATTLE_BOX.y,
                             vx: 0,
-                            vy: 4
+                            vy: boneSpeed
                         });
                     }
                     
@@ -827,7 +982,7 @@
                             x: BATTLE_BOX.x + 50 + i * 60,
                             y: BATTLE_BOX.y + BATTLE_BOX.height,
                             vx: 0,
-                            vy: -4
+                            vy: -boneSpeed
                         });
                     }
                     break;
@@ -856,7 +1011,7 @@
                             x: BATTLE_BOX.x,
                             y: 0,
                             startY: BATTLE_BOX.y + 30 + i * 25,
-                            vx: 3
+                            vx: boneSpeed * 0.6
                         });
                     }
                     break;
@@ -932,17 +1087,19 @@
                     break;
                     
                 case 'bones-chase':
-                    // Homing bones
-                    for (let i = 0; i < 4; i++) {
+                    // Homing bones (less OP)
+                    for (let i = 0; i < 3; i++) { // Reduced count
                         bones.push({
                             type: 'chase',
                             x: BATTLE_BOX.x + Math.random() * BATTLE_BOX.width,
                             y: BATTLE_BOX.y + Math.random() * BATTLE_BOX.height,
                             vx: 0,
                             vy: 0,
-                            speed: 2 + Math.random() * 1.5
+                            speed: DIFFICULTY_SETTINGS[difficulty].homingSpeed
                         });
                     }
+                    // Activate homing phase
+                    startHomingPhase();
                     break;
                     
                 case 'bones-cross':
@@ -955,13 +1112,13 @@
                         bones.push({
                             x: BATTLE_BOX.x,
                             y: centerY - 40 + i * 25,
-                            vx: 5,
+                            vx: boneSpeed,
                             vy: 0
                         });
                         bones.push({
                             x: BATTLE_BOX.x + BATTLE_BOX.width,
                             y: centerY - 40 + i * 25,
-                            vx: -5,
+                            vx: -boneSpeed,
                             vy: 0
                         });
                     }
@@ -972,13 +1129,13 @@
                             x: centerX - 40 + i * 25,
                             y: BATTLE_BOX.y,
                             vx: 0,
-                            vy: 5
+                            vy: boneSpeed
                         });
                         bones.push({
                             x: centerX - 40 + i * 25,
                             y: BATTLE_BOX.y + BATTLE_BOX.height,
                             vx: 0,
-                            vy: -5
+                            vy: -boneSpeed
                         });
                     }
                     break;
@@ -1005,6 +1162,7 @@
                 // Check win condition
                 if (winTimer <= 0 && gameState === 'fighting') {
                     clearInterval(winTimerInterval);
+                    stopHomingPhase();
                     gameState = 'victory';
                     dialogue = 'nice job, bud.';
                     showDialogue = true;
@@ -1034,12 +1192,24 @@
             keysPressed[e.key] = false;
         });
         
+        easyBtn.addEventListener('click', () => {
+            init('easy');
+        });
+        
+        mediumBtn.addEventListener('click', () => {
+            init('medium');
+        });
+        
+        hardBtn.addEventListener('click', () => {
+            init('hard');
+        });
+        
         retryBtn.addEventListener('click', () => {
-            init();
+            init(difficulty);
         });
         
         victoryBtn.addEventListener('click', () => {
-            init();
+            init(difficulty);
         });
         
         // Initialize and start game
