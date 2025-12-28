@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sans Fight: Ultimate Edition</title>
+    <title>Sans Fight: Balanced Edition</title>
     <style>
         * {
             margin: 0;
@@ -236,7 +236,7 @@
             z-index: 5;
         }
         
-        .homing-timer {
+        .homing-timer, .laser-timer {
             position: absolute;
             top: 60px;
             left: 50%;
@@ -307,12 +307,13 @@
     </style>
 </head>
 <body>
-    <h1 id="game-title">SANS FIGHT: ULTIMATE EDITION</h1>
+    <h1 id="game-title">SANS FIGHT: BALANCED EDITION</h1>
     
     <div id="game-container">
         <canvas id="game-canvas" width="640" height="480"></canvas>
         <div class="attack-indicator" id="attack-indicator"></div>
         <div class="homing-timer" id="homing-timer"></div>
+        <div class="laser-timer" id="laser-timer"></div>
         <div class="damage-flash" id="damage-flash"></div>
         <div class="victory-flash" id="victory-flash"></div>
         <div class="warning-flash" id="warning-flash"></div>
@@ -374,7 +375,7 @@
             'bones-chase', 
             'bones-cross',
             'laser-sweep',      // New laser attack
-            'laser-grid',       // New grid laser attack
+            'laser-grid',       // New grid laser attack (less OP)
             'bone-explosion',   // New explosion attack
             'gravity-reverse'   // New reverse gravity attack
         ];
@@ -417,6 +418,9 @@
         let homingTimerInterval = null;
         let reverseGravity = false;
         let gravityTimer = 0;
+        let laserActive = false;
+        let laserTimer = 0;
+        let laserTimerInterval = null;
         
         // DOM elements
         const canvas = document.getElementById('game-canvas');
@@ -433,6 +437,7 @@
         const victoryBtn = document.getElementById('victory-btn');
         const attackIndicator = document.getElementById('attack-indicator');
         const homingTimerEl = document.getElementById('homing-timer');
+        const laserTimerEl = document.getElementById('laser-timer');
         const damageFlash = document.getElementById('damage-flash');
         const victoryFlash = document.getElementById('victory-flash');
         const warningFlash = document.getElementById('warning-flash');
@@ -483,6 +488,8 @@
             homingTimer = 0;
             reverseGravity = false;
             gravityTimer = 0;
+            laserActive = false;
+            laserTimer = 0;
             
             // Clear any existing timers
             if (winTimerInterval) {
@@ -492,6 +499,10 @@
             if (homingTimerInterval) {
                 clearInterval(homingTimerInterval);
                 homingTimerInterval = null;
+            }
+            if (laserTimerInterval) {
+                clearInterval(laserTimerInterval);
+                laserTimerInterval = null;
             }
             
             updateUI();
@@ -535,6 +546,14 @@
                 homingTimerEl.style.opacity = '1';
             } else {
                 homingTimerEl.style.opacity = '0';
+            }
+            
+            // Update laser timer display
+            if (laserActive) {
+                laserTimerEl.textContent = `DANGEROUS ATTACK: ${Math.ceil(laserTimer)}s`;
+                laserTimerEl.style.opacity = '1';
+            } else {
+                laserTimerEl.style.opacity = '0';
             }
         }
         
@@ -601,6 +620,41 @@
             
             // Remove all homing bones immediately
             bones = bones.filter(bone => bone.type !== 'chase');
+        }
+        
+        // Start laser timer
+        function startLaserTimer(duration = 5) {
+            laserActive = true;
+            laserTimer = duration;
+            
+            // Show laser timer
+            laserTimerEl.style.opacity = '1';
+            
+            // Clear any existing laser timer
+            if (laserTimerInterval) {
+                clearInterval(laserTimerInterval);
+            }
+            
+            // Start laser timer
+            laserTimerInterval = setInterval(() => {
+                laserTimer -= 0.1;
+                
+                if (laserTimer <= 0) {
+                    stopLaserTimer();
+                }
+                
+                updateUI();
+            }, 100);
+        }
+        
+        // Stop laser timer
+        function stopLaserTimer() {
+            laserActive = false;
+            if (laserTimerInterval) {
+                clearInterval(laserTimerInterval);
+                laserTimerInterval = null;
+            }
+            laserTimerEl.style.opacity = '0';
         }
         
         // Start reverse gravity phase
@@ -679,70 +733,77 @@
             }, 2000);
         }
         
-        // Draw Sans
+        // Draw Sans (Enhanced)
         function drawSans() {
             const sansX = 320;
             const sansY = 100;
             
-            // Body
+            // Body with better proportions
             ctx.fillStyle = '#fff';
-            ctx.fillRect(sansX - 30, sansY + 40, 60, 80);
+            ctx.fillRect(sansX - 25, sansY + 35, 50, 85); // More proportional body
             
-            // Head
+            // Head with better shape
+            ctx.fillStyle = '#fff';
             ctx.beginPath();
-            ctx.arc(sansX, sansY, 35, 0, Math.PI * 2);
+            ctx.arc(sansX, sansY, 30, 0, Math.PI * 2); // Slightly smaller head
             ctx.fill();
             
-            // Eyes
+            // Eyes with better positioning
             ctx.fillStyle = '#000';
             if (sansExpression === 'normal') {
+                // Normal eyes - slightly larger and better positioned
                 ctx.beginPath();
-                ctx.arc(sansX - 12, sansY - 5, 8, 0, Math.PI * 2);
+                ctx.arc(sansX - 10, sansY - 3, 9, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.beginPath();
-                ctx.arc(sansX + 12, sansY - 5, 8, 0, Math.PI * 2);
+                ctx.arc(sansX + 10, sansY - 3, 9, 0, Math.PI * 2);
                 ctx.fill();
             } else if (sansExpression === 'wink') {
-                // Left eye glowing
+                // Left eye glowing (larger glow)
                 ctx.fillStyle = '#00ffff';
                 ctx.beginPath();
-                ctx.arc(sansX - 12, sansY - 5, 10, 0, Math.PI * 2);
+                ctx.arc(sansX - 10, sansY - 3, 12, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Right eye closed
+                // Right eye closed (better closed eye)
                 ctx.fillStyle = '#000';
-                ctx.fillRect(sansX + 5, sansY - 5, 14, 3);
+                ctx.fillRect(sansX + 3, sansY - 3, 14, 2);
             } else if (sansExpression === 'smile') {
                 // Happy expression for victory
                 ctx.beginPath();
-                ctx.arc(sansX - 12, sansY - 5, 8, 0, Math.PI * 2);
+                ctx.arc(sansX - 10, sansY - 3, 9, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.beginPath();
-                ctx.arc(sansX + 12, sansY - 5, 8, 0, Math.PI * 2);
+                ctx.arc(sansX + 10, sansY - 3, 9, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Big smile
+                // Big smile with better curve
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.arc(sansX, sansY + 15, 20, 0, Math.PI);
+                ctx.arc(sansX, sansY + 12, 18, 0, Math.PI);
                 ctx.stroke();
             }
             
-            // Smile (normal)
+            // Smile (normal) - better positioned
             if (sansExpression !== 'smile') {
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(sansX, sansY + 10, 15, 0, Math.PI);
+                ctx.arc(sansX, sansY + 8, 14, 0, Math.PI);
                 ctx.stroke();
             }
             
-            // Jacket
+            // Jacket with better proportions
             ctx.fillStyle = '#000';
-            ctx.fillRect(sansX - 35, sansY + 45, 70, 75);
+            ctx.fillRect(sansX - 30, sansY + 40, 60, 80);
             ctx.fillStyle = '#fff';
-            ctx.fillRect(sansX - 30, sansY + 50, 25, 65);
+            ctx.fillRect(sansX - 25, sansY + 45, 20, 70);
+            
+            // Arms
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(sansX - 35, sansY + 60, 10, 30);
+            ctx.fillRect(sansX + 25, sansY + 60, 10, 30);
         }
         
         // Draw battle box
@@ -780,7 +841,7 @@
                     ctx.fillStyle = '#fff'; // Reset for next bone
                 } else if (bone.type === 'explosion') {
                     // Draw explosion bone with pulsing effect
-                    const pulse = Math.sin(Date.now() * 0.01) * 5;
+                    const pulse = Math.sin(Date.now() * 0.01) * 3;
                     ctx.fillStyle = '#ff6666';
                     ctx.fillRect(bone.x - 5 - pulse/2, bone.y - 15 - pulse/2, 10 + pulse, 30 + pulse);
                     ctx.fillStyle = '#fff';
@@ -821,21 +882,21 @@
         function drawLasers() {
             lasers.forEach(laser => {
                 if (laser.type === 'sweep') {
-                    // Horizontal sweeping laser
-                    ctx.fillStyle = laser.active ? '#ff0000' : 'rgba(255, 0, 0, 0.3)';
+                    // Horizontal sweeping laser - less intense
+                    ctx.fillStyle = laser.active ? '#ff4444' : 'rgba(255, 68, 68, 0.3)';
                     ctx.fillRect(laser.x, laser.y, laser.width, laser.height);
                     
-                    // Laser glow
+                    // Laser glow - reduced intensity
                     if (laser.active) {
-                        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-                        ctx.fillRect(laser.x - 5, laser.y - 5, laser.width + 10, laser.height + 10);
+                        ctx.fillStyle = 'rgba(255, 68, 68, 0.2)';
+                        ctx.fillRect(laser.x - 3, laser.y - 3, laser.width + 6, laser.height + 6);
                     }
                 } else if (laser.type === 'grid') {
-                    // Grid laser pattern
-                    ctx.strokeStyle = laser.active ? '#ff00ff' : 'rgba(255, 0, 255, 0.3)';
-                    ctx.lineWidth = laser.active ? 3 : 1;
+                    // Grid laser pattern - much less OP
+                    ctx.strokeStyle = laser.active ? '#ff88ff' : 'rgba(255, 136, 255, 0.2)';
+                    ctx.lineWidth = laser.active ? 1 : 0.5;
                     
-                    // Vertical lines
+                    // Vertical lines - wider spacing
                     for (let i = 0; i < laser.columns; i++) {
                         const x = laser.x + i * laser.spacing;
                         ctx.beginPath();
@@ -844,7 +905,7 @@
                         ctx.stroke();
                     }
                     
-                    // Horizontal lines
+                    // Horizontal lines - wider spacing
                     for (let i = 0; i < laser.rows; i++) {
                         const y = laser.y + i * laser.spacing;
                         ctx.beginPath();
@@ -1029,15 +1090,15 @@
             lasers = lasers.map(laser => {
                 if (laser.type === 'sweep') {
                     // Sweeping laser logic
-                    laser.sweepPhase += 0.05;
+                    laser.sweepPhase += 0.03; // Slower sweep
                     laser.x = BATTLE_BOX.x + Math.sin(laser.sweepPhase) * (BATTLE_BOX.width - laser.width);
                     
-                    // Activate laser periodically
-                    if (laser.sweepPhase % (Math.PI * 2) < 0.5) {
+                    // Activate laser periodically with timer
+                    if (laser.sweepPhase % (Math.PI * 2) < 0.3) {
                         laser.active = true;
                         setTimeout(() => {
                             if (lasers.includes(laser)) laser.active = false;
-                        }, 300);
+                        }, 200); // Shorter activation time
                     }
                 }
                 return laser;
@@ -1068,7 +1129,7 @@
                         let damage = 5;
                         if (bone.type === 'dart') damage = 10;
                         if (bone.type === 'chase') damage = 7;
-                        if (bone.type === 'explosion') damage = 15;
+                        if (bone.type === 'explosion') damage = 12; // Reduced from 15
                         
                         playerHP = Math.max(0, playerHP - damage);
                         iframes = 30;
@@ -1112,28 +1173,32 @@
                                 playerPos.x <= laser.x + laser.width &&
                                 playerPos.y >= laser.y && 
                                 playerPos.y <= laser.y + laser.height) {
-                                playerHP = Math.max(0, playerHP - 20);
+                                playerHP = Math.max(0, playerHP - 15); // Reduced from 20
                                 iframes = 40;
                                 sansExpression = 'wink';
                                 showDamageFlash();
-                                triggerScreenShake(25);
-                                createParticles(playerPos.x, playerPos.y, '#ff0000', 20);
+                                triggerScreenShake(20); // Reduced intensity
+                                createParticles(playerPos.x, playerPos.y, '#ff4444', 15);
                                 setTimeout(() => sansExpression = 'normal', 500);
                                 break;
                             }
                         } else if (laser.type === 'grid') {
-                            // Check if player is on grid intersection
+                            // Check if player is on grid intersection - much less OP
                             const gridX = Math.floor((playerPos.x - laser.x) / laser.spacing);
                             const gridY = Math.floor((playerPos.y - laser.y) / laser.spacing);
                             
+                            // Only damage if player is exactly on intersection (harder to hit)
+                            const exactX = Math.abs(playerPos.x - (laser.x + gridX * laser.spacing)) < 5;
+                            const exactY = Math.abs(playerPos.y - (laser.y + gridY * laser.spacing)) < 5;
+                            
                             if (gridX >= 0 && gridX < laser.columns && 
-                                gridY >= 0 && gridY < laser.rows) {
-                                playerHP = Math.max(0, playerHP - 5);
+                                gridY >= 0 && gridY < laser.rows && exactX && exactY) {
+                                playerHP = Math.max(0, playerHP - 8); // Reduced damage
                                 iframes = 30;
                                 sansExpression = 'wink';
                                 showDamageFlash();
-                                triggerScreenShake(15);
-                                createParticles(playerPos.x, playerPos.y, '#ff00ff', 10);
+                                triggerScreenShake(10); // Reduced intensity
+                                createParticles(playerPos.x, playerPos.y, '#ff88ff', 8);
                                 setTimeout(() => sansExpression = 'normal', 500);
                                 break;
                             }
@@ -1152,6 +1217,7 @@
                 showDialogue = true;
                 sansExpression = 'wink';
                 stopHomingPhase();
+                stopLaserTimer();
             }
             
             updateUI();
@@ -1179,6 +1245,12 @@
             // Show warning for dangerous attacks
             if (randomAttack === 'laser-sweep' || randomAttack === 'laser-grid' || randomAttack === 'bone-explosion') {
                 showWarningFlash();
+                // Start laser timer for dangerous attacks
+                if (randomAttack === 'laser-sweep') {
+                    startLaserTimer(4); // 4 second timer
+                } else if (randomAttack === 'bone-explosion') {
+                    startLaserTimer(3); // 3 second timer
+                }
             }
             
             switch(randomAttack) {
@@ -1373,35 +1445,37 @@
                     break;
                     
                 case 'laser-sweep':
-                    // Sweeping horizontal laser
-                    lasers.push({
-                        type: 'sweep',
-                        x: BATTLE_BOX.x,
-                        y: BATTLE_BOX.y + Math.random() * BATTLE_BOX.height,
-                        width: 20,
-                        height: 20,
-                        active: false,
-                        sweepPhase: 0,
-                        life: 300
-                    });
+                    // Sweeping horizontal laser - less frequent
+                    if (Math.random() > 0.3) { // Only 70% chance to create
+                        lasers.push({
+                            type: 'sweep',
+                            x: BATTLE_BOX.x,
+                            y: BATTLE_BOX.y + Math.random() * BATTLE_BOX.height,
+                            width: 15, // Narrower laser
+                            height: 15, // Smaller hitbox
+                            active: false,
+                            sweepPhase: 0,
+                            life: 250
+                        });
+                    }
                     break;
                     
                 case 'laser-grid':
-                    // Grid laser pattern
+                    // Grid laser pattern - much less OP
                     lasers.push({
                         type: 'grid',
                         x: BATTLE_BOX.x,
                         y: BATTLE_BOX.y,
                         width: BATTLE_BOX.width,
                         height: BATTLE_BOX.height,
-                        spacing: 40,
-                        columns: Math.floor(BATTLE_BOX.width / 40),
-                        rows: Math.floor(BATTLE_BOX.height / 40),
+                        spacing: 60, // Wider spacing (was 40)
+                        columns: Math.floor(BATTLE_BOX.width / 60),
+                        rows: Math.floor(BATTLE_BOX.height / 60),
                         active: false,
-                        life: 200
+                        life: 150 // Shorter duration
                     });
                     
-                    // Activate grid periodically
+                    // Activate grid periodically - less frequent
                     let gridActivation = 0;
                     const gridInterval = setInterval(() => {
                         if (!lasers.some(l => l.type === 'grid')) {
@@ -1415,25 +1489,25 @@
                             gridLaser.active = true;
                             setTimeout(() => {
                                 if (gridLaser) gridLaser.active = false;
-                            }, 200);
+                            }, 150); // Shorter activation
                         }
                         
-                        if (gridActivation > 10) {
+                        if (gridActivation > 6) { // Fewer activations
                             clearInterval(gridInterval);
                         }
-                    }, 800);
+                    }, 1000); // Longer delay between activations
                     break;
                     
                 case 'bone-explosion':
-                    // Bone explosion attack
-                    const explosionCount = 12;
+                    // Bone explosion attack - fewer bones
+                    const explosionCount = 8; // Reduced from 12
                     for (let i = 0; i < explosionCount; i++) {
                         bones.push({
                             type: 'explosion',
                             x: BATTLE_BOX.x + BATTLE_BOX.width/2,
                             y: BATTLE_BOX.y + BATTLE_BOX.height/2,
-                            vx: Math.cos(i / explosionCount * Math.PI * 2) * 4,
-                            vy: Math.sin(i / explosionCount * Math.PI * 2) * 4,
+                            vx: Math.cos(i / explosionCount * Math.PI * 2) * 3, // Slower speed
+                            vy: Math.sin(i / explosionCount * Math.PI * 2) * 3,
                             pulsePhase: 0
                         });
                     }
@@ -1442,13 +1516,13 @@
                 case 'gravity-reverse':
                     // Reverse gravity attack
                     startReverseGravity();
-                    // Spawn bones that fall upward
-                    for (let i = 0; i < 10; i++) {
+                    // Spawn bones that fall upward - fewer bones
+                    for (let i = 0; i < 7; i++) { // Reduced from 10
                         bones.push({
                             x: BATTLE_BOX.x + 20 + Math.random() * (BATTLE_BOX.width - 40),
                             y: BATTLE_BOX.y + BATTLE_BOX.height + 20,
-                            vx: (Math.random() - 0.5) * 3,
-                            vy: 5 // Falling upward
+                            vx: (Math.random() - 0.5) * 2, // Slower horizontal speed
+                            vy: 4 // Slower upward speed
                         });
                     }
                     break;
@@ -1476,6 +1550,7 @@
                 if (winTimer <= 0 && gameState === 'fighting') {
                     clearInterval(winTimerInterval);
                     stopHomingPhase();
+                    stopLaserTimer();
                     gameState = 'victory';
                     dialogue = 'nice job, bud.';
                     showDialogue = true;
